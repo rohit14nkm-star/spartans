@@ -1,0 +1,98 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// LCD address, columns, rows
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ESP32 pins
+const int potPin = 34;
+const int greenLED = 18;
+const int yellowLED = 19;
+const int redLED = 23;
+
+int readings[5];
+int indexReading = 0;
+int demand = 0;
+int forecast = 0;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(greenLED, OUTPUT);
+  pinMode(yellowLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
+
+  Wire.begin(21, 22);
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Public Service");
+  lcd.setCursor(0, 1);
+  lcd.print("Demand Forecast");
+  delay(2000);
+  lcd.clear();
+
+  // Initialize reading history
+  int initial = analogRead(potPin);
+  int initialDemand = map(initial, 0, 4095, 0, 100);
+
+  for (int i = 0; i < 5; i++) {
+    readings[i] = initialDemand;
+  }
+}
+
+void loop() {
+  // Read simulated service demand
+  int sensorValue = analogRead(potPin);
+  demand = map(sensorValue, 0, 4095, 0, 100);
+
+  // Store recent demand readings
+  readings[indexReading] = demand;
+  indexReading = (indexReading + 1) % 5;
+
+  // Calculate average demand
+  int total = 0;
+  for (int i = 0; i < 5; i++) {
+    total += readings[i];
+  }
+  int average = total / 5;
+
+  // Simple forecast based on recent average
+  forecast = (demand + average) / 2;
+
+  // Control LEDs based on forecast
+  digitalWrite(greenLED, LOW);
+  digitalWrite(yellowLED, LOW);
+  digitalWrite(redLED, LOW);
+
+  if (forecast < 40) {
+    digitalWrite(greenLED, HIGH);
+  } 
+  else if (forecast < 70) {
+    digitalWrite(yellowLED, HIGH);
+  } 
+  else {
+    digitalWrite(redLED, HIGH);
+  }
+
+  // Display results on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Demand: ");
+  lcd.print(demand);
+  lcd.print("%   ");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Forecast: ");
+  lcd.print(forecast);
+  lcd.print("%  ");
+
+  // Print data to Serial Monitor
+  Serial.print("Current Demand: ");
+  Serial.print(demand);
+  Serial.print("% | Forecast: ");
+  Serial.print(forecast);
+  Serial.println("%");
+
+  delay(1000);
+}
